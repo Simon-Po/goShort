@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"errors"
-	"fmt"
+	"log"
 	"io"
 	"net/http"
 	"os"
@@ -12,9 +12,6 @@ import (
 	"github.com/google/uuid"
 )
 
-func hello(w http.ResponseWriter, req *http.Request) {
-	fmt.Fprintf(w, "hello\n")
-}
 
 type ReqBody struct {
 	Url    string `json:"url"`
@@ -33,12 +30,12 @@ func create(w http.ResponseWriter, req *http.Request) {
 	var rb ReqBody
 	err = json.Unmarshal(b, &rb)
 	if err != nil {
-		fmt.Println("Error: Could not Unmarshal Body")
+		log.Println("Error: Could not Unmarshal Body")
 		http.Error(w, err.Error(), 500)
 		return
 	}
 	found_url,_ := dbCheckIfExistsUrl(&rb.Url)
-	fmt.Println("Found Url: ",found_url)
+	log.Println("Found Url: ",found_url)
 	if found_url != "" {
 		 w.Write([]byte(found_url)) 
 		 return
@@ -46,7 +43,7 @@ func create(w http.ResponseWriter, req *http.Request) {
 
 	length,err := strconv.Atoi(rb.Length)
 	if err != nil {
-		fmt.Println("Could not Atoi the length")
+		log.Println("Could not Atoi the length")
 	}
 	var shortUrl string
 	for {
@@ -59,7 +56,7 @@ func create(w http.ResponseWriter, req *http.Request) {
 		}
 	}
 
-	fmt.Println("short: ", shortUrl)
+	log.Println("short: ", shortUrl)
 	dbWriteNewUrl(rb.Url, shortUrl)
 	w.Write([]byte(shortUrl))
 
@@ -69,15 +66,15 @@ func dbWriteNewUrl(url string, shortUrl string) error {
 	f, err := os.OpenFile("testdb.txt",os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	defer f.Close()
 	if err != nil {
-		fmt.Println("Testdb could not be opened")
+		log.Println("Testdb could not be opened")
 		return err
 	}
 
 	input := url + " " + shortUrl + "\n"
 	_, err = f.Write([]byte(input))
 	if err != nil {
-		fmt.Println(err)
-		fmt.Println("could not write to Testdb")
+		log.Println(err)
+		log.Println("could not write to Testdb")
 		return err
 	}
 
@@ -88,10 +85,10 @@ func dbWriteNewUrl(url string, shortUrl string) error {
 func dbCheckIfExistsUrl(url *string) (string,error) {
 	dat, err := os.ReadFile("testdb.txt")
 	if err != nil {
-		fmt.Println("Error: could not find db file")
+		log.Println("Error: could not find db file")
 	}
 	if len(dat) < 1 {
-		fmt.Println("Database is empty")
+		log.Println("Database is empty")
 		return "",err
 	}
 	db_string := string(dat)
@@ -109,23 +106,23 @@ func dbCheckIfExistsUrl(url *string) (string,error) {
 				return sUrl,nil
 		}
 	}
-	fmt.Print(string(dat))
+	log.Print(string(dat))
 	return "",err  
 }
 func dbCheckIfExistsCollision(shortUrl *string) error {
 	dat, err := os.ReadFile("testdb.txt")
 	if err != nil {
-		fmt.Println("Error: could not find db file")
+		log.Println("Error: could not find db file")
 	}
 	if len(dat) < 1 {
-		fmt.Println("Database is empty")
+		log.Println("Database is empty")
 		return nil
 	}
 	db_string := string(dat)
-	fmt.Println("--------------")
-	fmt.Println(db_string)
-	fmt.Println("--------------")
-	fmt.Println("db_string: ", db_string)
+	log.Println("--------------")
+	log.Println(db_string)
+	log.Println("--------------")
+	log.Println("db_string: ", db_string)
 	for line := range strings.SplitSeq(db_string, "\n") {
 
 		content := strings.Split(line, " ")
@@ -133,17 +130,17 @@ func dbCheckIfExistsCollision(shortUrl *string) error {
 		if len(content) > 2 || len(content) < 2 {
 			continue
 		}  
-			fmt.Println("content: ", content)
+			log.Println("content: ", content)
 			sUrl := content[1]
-			fmt.Println("sUrl: ",sUrl)
+			log.Println("sUrl: ",sUrl)
 
-			fmt.Println("shortUrl: ",*shortUrl)
+			log.Println("shortUrl: ",*shortUrl)
 
 			if sUrl == *shortUrl {
 				return err
 		}
 	}
-	fmt.Print(string(dat))
+	log.Print(string(dat))
 	return nil
 }
 
@@ -161,8 +158,7 @@ func getUuid(length int32) (string, error) {
 
 func main() {
 
-	http.HandleFunc("/hello", hello)
 	http.HandleFunc("/create", create)
-	fmt.Println("Running on localhost:8000")
+	log.Println("Running on localhost:8000")
 	http.ListenAndServe(":8000", nil)
 }
