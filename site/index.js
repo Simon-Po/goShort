@@ -1,62 +1,64 @@
 document.addEventListener('DOMContentLoaded', () => {
-  const input = document.querySelector('.neo-input');
+  const form = document.querySelector('.neo-form');
+  const urlInput = document.querySelector('#user_input');
+  const nameInput = document.querySelector('#urlName');
+  const slider = document.getElementById('lengthSlider');
+  const sliderLabel = document.querySelector('label[for="lengthSlider"]');
   const validateBtn = document.querySelector('.btn.validate');
   const confirmBtn = document.querySelector('.btn.confirm');
-  const slider = document.getElementById('lengthSlider');
-  const valueDisplay = document.getElementById('lengthValue');
 
-  valueDisplay.textContent = slider.value;
-
-  slider.addEventListener('input', () => {
-    valueDisplay.textContent = slider.value;
-  });
-  const showResult = (resultText) => {
-   
-    let resultEl = document.getElementById('result');
-    if (!resultEl) {
-      resultEl = document.createElement('div');
-      resultEl.id = 'result';
-      resultEl.style.marginTop = '1rem';
-      resultEl.style.fontFamily = 'sans-serif';
-      resultEl.style.fontWeight = 'bold';
-      document.querySelector('.neo-form').appendChild(resultEl);
-    }
-    resultEl.textContent = resultText;
+  const showResult = (t) => {
+    let el = document.getElementById('result');
+    if (!el) { el = document.createElement('div'); el.id='result'; form.appendChild(el); }
+    el.textContent = t;
   };
 
-  validateBtn.addEventListener('click', async (e) => {
+  // 👇 toggle slider visibility based on urlName input
+  nameInput.addEventListener('input', () => {
+    if (nameInput.value.trim() !== '') {
+      slider.style.display = 'none';
+      sliderLabel.style.display = 'none';
+    } else {
+      slider.style.display = 'block';
+      sliderLabel.style.display = 'block';
+    }
+  });
+
+  confirmBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    const value = input.value;
+    if (!form.reportValidity()) return;
+
+    const payload = {
+      name: nameInput.value,
+      url: urlInput.value,
+      length: String(slider.value)
+    };
+
+    console.log('about to POST /create with payload:', payload);
+
     try {
-      const resp = await fetch('/check', {
+      const resp = await fetch('/create', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: value }),
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify(payload),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-      let text = await resp.text();
-      if(!text) {
-        text = "Could not be found"
-      }
+      const text = await resp.text();
       showResult(`POST result: ${text}`);
     } catch (err) {
       showResult(`POST error: ${err}`);
     }
   });
 
-  confirmBtn.addEventListener('click', async (e) => {
+  validateBtn.addEventListener('click', async (e) => {
     e.preventDefault();
-    const value = input.value;
-    const length = slider.value;
     try {
-      const resp = await fetch('/create', {
+      const resp = await fetch('/check', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ url: value , length}),
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ url: urlInput.value }),
       });
-      if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
       const text = await resp.text();
-      showResult(`POST result: ${text}`);
+      showResult(`POST result: ${text || 'Could not be found'}`);
     } catch (err) {
       showResult(`POST error: ${err}`);
     }
