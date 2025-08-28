@@ -2,163 +2,130 @@ package main
 
 import (
 	"encoding/json"
-	"errors"
-	"log"
 	"io"
+	"log"
 	"net/http"
-	"os"
-	"strings"
 	"strconv"
-	"github.com/google/uuid"
-)
 
+)
 
 type ReqBody struct {
 	Url    string `json:"url"`
-	Length string  `json:"length"`
+	Length string `json:"length"`
 }
 
-func create(w http.ResponseWriter, req *http.Request) {
-	b, err := io.ReadAll(req.Body)
-	defer req.Body.Close()
+func check(db UrlDB) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
+		b, err := io.ReadAll(req.Body)
+		defer req.Body.Close()
 
-	var rb ReqBody
-	err = json.Unmarshal(b, &rb)
-	if err != nil {
-		log.Println("Error: Could not Unmarshal Body")
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	found_url,_ := dbCheckIfExistsUrl(&rb.Url)
-	log.Println("Found Url: ",found_url)
-	if found_url != "" {
-		 w.Write([]byte(found_url)) 
-		 return
-	}
-
-	length,err := strconv.Atoi(rb.Length)
-	if err != nil {
-		log.Println("Could not Atoi the length")
-	}
-	var shortUrl string
-	for {
-		shortUrl, err = getUuid(int32(length))
 		if err != nil {
-			continue
+			http.Error(w, err.Error(), 500)
+			return
 		}
-		if dbCheckIfExistsCollision(&shortUrl) == nil {
-			break
+
+		var rb ReqBody
+		err = json.Unmarshal(b, &rb)
+		if err != nil {
+			log.Println("Error: Could not Unmarshal Body")
+			http.Error(w, err.Error(), 500)
+			return
 		}
-	}
-
-	log.Println("short: ", shortUrl)
-	dbWriteNewUrl(rb.Url, shortUrl)
-	w.Write([]byte(shortUrl))
-
-	// return short url to sender
-}
-func dbWriteNewUrl(url string, shortUrl string) error {
-	f, err := os.OpenFile("testdb.txt",os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	defer f.Close()
-	if err != nil {
-		log.Println("Testdb could not be opened")
-		return err
-	}
-
-	input := url + " " + shortUrl + "\n"
-	_, err = f.Write([]byte(input))
-	if err != nil {
-		log.Println(err)
-		log.Println("could not write to Testdb")
-		return err
-	}
-
-	return nil
-}
-
-
-func dbCheckIfExistsUrl(url *string) (string,error) {
-	dat, err := os.ReadFile("testdb.txt")
-	if err != nil {
-		log.Println("Error: could not find db file")
-	}
-	if len(dat) < 1 {
-		log.Println("Database is empty")
-		return "",err
-	}
-	db_string := string(dat)
-	for line := range strings.SplitSeq(db_string, "\n") {
-
-		content := strings.Split(line, " ")
-
-		if len(content) > 2 || len(content) < 2 {
-			continue
-		}  
-		db_url,sUrl := content[0],content[1]
-
-
-			if db_url == *url {
-				return sUrl,nil
+		found_url, _ := db.CheckUrl(rb.Url)
+		if found_url != "" {
+			log.Println("Found Url: ", found_url)
+			log.Println("Found Url len: ", len(found_url))
+			w.Write([]byte(found_url + " is your Url"))
+			return
 		}
 	}
-	log.Print(string(dat))
-	return "",err  
 }
-func dbCheckIfExistsCollision(shortUrl *string) error {
-	dat, err := os.ReadFile("testdb.txt")
-	if err != nil {
-		log.Println("Error: could not find db file")
-	}
-	if len(dat) < 1 {
-		log.Println("Database is empty")
-		return nil
-	}
-	db_string := string(dat)
-	log.Println("--------------")
-	log.Println(db_string)
-	log.Println("--------------")
-	log.Println("db_string: ", db_string)
-	for line := range strings.SplitSeq(db_string, "\n") {
+func create(db UrlDB) http.HandlerFunc {
+	return func(w http.ResponseWriter, req *http.Request) {
 
-		content := strings.Split(line, " ")
+		b, err := io.ReadAll(req.Body)
+		defer req.Body.Close()
 
-		if len(content) > 2 || len(content) < 2 {
-			continue
-		}  
-			log.Println("content: ", content)
-			sUrl := content[1]
-			log.Println("sUrl: ",sUrl)
-
-			log.Println("shortUrl: ",*shortUrl)
-
-			if sUrl == *shortUrl {
-				return err
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
 		}
+
+		var rb ReqBody
+		err = json.Unmarshal(b, &rb)
+		if err != nil {
+			log.Println("Error: Could not Unmarshal Body")
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		found_url, _ := db.CheckUrl(rb.Url)
+		log.Println("Found Url: ", found_url)
+		if found_url != "" {
+			w.Write([]byte(found_url))
+			return
+		}
+
+		length, err := strconv.Atoi(rb.Length)
+		if err != nil {
+			log.Println("Could not Atoi the length")
+		}
+		var shortUrl string
+		for {
+			
+			id := Uuid{}
+			shortUrl, err = id.Generate(int32(length))
+			if err != nil {
+				continue
+			}
+			if db.CheckForCollion(&shortUrl) == nil {
+				break
+			}
+		}
+
+		log.Println("short: ", shortUrl)
+		db.WriteUrl(rb.Url,shortUrl)	
+		w.Write([]byte(shortUrl))
+
+		// return short url to sender
 	}
-	log.Print(string(dat))
-	return nil
 }
 
-func getUuid(length int32) (string, error) {
-	uuidLong := strings.ReplaceAll(uuid.New().String(), "-", "")
+func home(db UrlDB) http.HandlerFunc {
+		return func (writer http.ResponseWriter, req *http.Request) {
 
-	if length > 32 {
-		return "", errors.New("length too long")
+		switch req.URL.Path {
+		case "/":
+		 http.ServeFile(writer, req, "site/index.html")
+		default:
+			url,err := db.CheckUrl(req.URL.Path)
+			if err != nil {
+				log.Fatal("Could not get surl from db")
+			}
+			if url != "" {
+				log.Println("Redirecting to: " + url)
+				serveSUrl(&url,req)
+			} else {
+		 		http.ServeFile(writer, req, "site/index.html")
+			}
+		}	
 	}
-	if length != 0 {
-		return uuidLong[:length], nil
-	}
-	return uuidLong, nil
+}
+
+func serveSUrl(url *string,req *http.Request) {
+
 }
 
 func main() {
+	db := textFileDb{
+		pathToTxt: "testdb.txt",
+	}
 
-	http.HandleFunc("/create", create)
+	http.HandleFunc("/", home(&db))
+	http.HandleFunc("/create", create(&db))
+	http.HandleFunc("/check", check(&db))
 	log.Println("Running on localhost:8000")
+	fs := http.FileServer(http.Dir("site"))
+	http.Handle("/site/", http.StripPrefix("/site/", fs))
 	http.ListenAndServe(":8000", nil)
 }
