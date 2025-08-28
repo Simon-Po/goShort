@@ -12,6 +12,7 @@ type UrlDB interface {
 	CheckUrl(url string) (string, error)
 	WriteUrl(url, shortUrl string) error
 	CheckForCollion(shortUrl *string) error
+	CheckSurl(surl string) (string,error)
 }
 
 type textFileDbBuffer map[string]string
@@ -65,8 +66,8 @@ func (db *textFileDb) textFileDbGetBuffer() {
 			if len(content) > 2 || len(content) < 2 {
 				continue
 			}
-			db_url, sUrl := content[0], content[1]
-			db.content[db_url] = sUrl
+			db_surl, db_url := content[0], content[1]
+			db.content[db_surl] = db_url
 		}
 
 	}
@@ -77,7 +78,20 @@ func (db *textFileDb) CheckUrl(url string) (string, error) {
 	log.Println("------------------------------")
 	log.Println(db.content)
 	log.Println("------------------------------")
-	return strings.TrimSpace(db.content[url]), nil
+	for k,v := range db.content {
+		if v == url {
+			return k,nil
+		}
+	}
+	return "", nil
+}
+
+func (db *textFileDb) CheckSurl(surl string) (string,error) {
+	db.textFileDbGetBuffer()
+	log.Println("------------------------------")
+	log.Println(db.content)
+	log.Println("------------------------------")
+	return strings.TrimSpace(db.content[surl]), nil
 }
 
 func (db *textFileDb) WriteUrl(url, shortUrl string) error {
@@ -88,7 +102,7 @@ func (db *textFileDb) WriteUrl(url, shortUrl string) error {
 		return err
 	}
 
-	input := url + " " + shortUrl + "\n"
+	input := shortUrl + " " + url + "\n"
 	_, err = f.Write([]byte(input))
 	if err != nil {
 		log.Println(err)

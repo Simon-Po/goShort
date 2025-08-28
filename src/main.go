@@ -6,7 +6,6 @@ import (
 	"log"
 	"net/http"
 	"strconv"
-
 )
 
 type ReqBody struct {
@@ -68,7 +67,8 @@ func create(db UrlDB) http.HandlerFunc {
 
 		length, err := strconv.Atoi(rb.Length)
 		if err != nil {
-			log.Println("Could not Atoi the length")
+			log.Println("Could not Atoi the length assigning default")
+			length = 30
 		}
 		var shortUrl string
 		for {
@@ -86,8 +86,6 @@ func create(db UrlDB) http.HandlerFunc {
 		log.Println("short: ", shortUrl)
 		db.WriteUrl(rb.Url,shortUrl)	
 		w.Write([]byte(shortUrl))
-
-		// return short url to sender
 	}
 }
 
@@ -98,13 +96,13 @@ func home(db UrlDB) http.HandlerFunc {
 		case "/":
 		 http.ServeFile(writer, req, "site/index.html")
 		default:
-			url,err := db.CheckUrl(req.URL.Path)
+			url,err := db.CheckSurl(req.URL.Path[1:])
 			if err != nil {
 				log.Fatal("Could not get surl from db")
 			}
 			if url != "" {
 				log.Println("Redirecting to: " + url)
-				serveSUrl(&url,req)
+				serveSUrl(writer,req,&url)
 			} else {
 		 		http.ServeFile(writer, req, "site/index.html")
 			}
@@ -112,8 +110,8 @@ func home(db UrlDB) http.HandlerFunc {
 	}
 }
 
-func serveSUrl(url *string,req *http.Request) {
-
+func serveSUrl(writer http.ResponseWriter,req *http.Request,url *string) {
+	http.Redirect(writer,req, *url,http.StatusMovedPermanently)	
 }
 
 func main() {
