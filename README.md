@@ -1,144 +1,123 @@
 # GoShort
 
-A tiny, no‑frills URL shortener written in Go with a simple vanilla JS frontend and a text‑file “database”. Ideal for learning, hacking, or running a small personal shortener locally.
+A tiny, no‑frills URL shortener written in Go. It serves a static frontend and supports two storage backends:
+
+- SQLite (default): durable single‑file DB under `/app/data/app.db`.
+- Text file (optional): a simple `testdb.txt` file for experimenting.
+
+The text file backend is just for fun and learning. Use SQLite for any real usage.
 
 ## Features
 
 - Minimal setup: single Go service + static site.
-- Random short codes with adjustable length.
-- Optional custom aliases (e.g., /my-link) when available.
+- Random short codes with adjustable length, or custom aliases.
 - Instant redirects via `/{short}`.
-- Text file storage (`testdb.txt`) that is easy to inspect/edit.
+- Dockerfile and docker‑compose for easy containerized runs.
 
-## Quick Start
-
-Prerequisites:
-
-- Go (the module targets `go 1.24.6`; Go ≥1.20 typically works).
-
-Run locally:
+## Run With Docker Compose (recommended)
 
 ```bash
 # From the repo root
-# Fetch deps (uuid)
+docker compose up --build
+# Then open http://localhost:8000
+```
+
+Notes:
+- Data persists in the `app_data` volume at `/app/data/app.db` inside the container.
+- To include the `sqlite` CLI tool in the image (for manual inspection), run:
+  - `INSTALL_SQLITE=true docker compose build && docker compose up`
+
+## Run With Docker (manual)
+
+```bash
+docker build -t goshort .
+docker run --rm -p 8000:8000 -v goshort-data:/app/data goshort
+```
+
+## Run Locally (Go)
+
+Prerequisite: Go 1.20+ (module targets `go 1.24.6`).
+
+```bash
+# Fetch dependencies
 go mod tidy
 
-# Option 1: run directly
+# Option A: SQLite backend (default)
+# The app expects the database at /app/data/app.db (absolute path).
+# Create the directory before running locally:
+sudo mkdir -p /app/data
 go run ./src
 
-# Option 2: build a binary
-mkdir -p bin && go build -o bin/goshort ./src
-./bin/goshort
+# Option B: Text file backend (demo only)
+go run ./src -textDb
 ```
 
-Open the UI at http://localhost:8000
-
-- Enter a destination URL.
-- Optionally set a custom name (alias). If you provide a name, the length slider is hidden.
-- Click “Check your Url” to see if there’s already a short code for the URL.
-- Click “Create Url” to create a new short link.
-
-## How It Works
-
-- Server: `src/main.go` exposes routes and serves the static site in `site/`.
-- IDs: `src/id.go` generates short codes using `github.com/google/uuid`.
-- Storage: `src/db.go` backs a simple text‑file “DB” called `testdb.txt`.
-  - Each line is `SHORT ORIGINAL_URL` separated by a single space.
-
-Example `testdb.txt` line:
-
-```
-abc123 https://example.com/docs
-```
-
-## Routes
-
-- `/` GET: Serves the UI (`site/index.html`).
-- `/{short}` GET: Redirects to the original URL (HTTP 301) if found.
-- `/create` POST: Creates a short URL mapping.
-- `/check` POST: Checks if a URL already has a short code.
+Open http://localhost:8000 to use the UI.
 
 ## API
 
-All requests and responses are plain text or JSON where noted.
-
 - POST `/create`
-  - Request body (JSON):
-    ```json
-    {
-      "url": "example.com",
-      "length": "18",
-      "name": "optional-custom-alias"
-    }
-    ```
+  - Request JSON:
+    { "url": "example.com", "length": "18", "name": "optional-alias" }
   - Behavior:
-    - If `name` is provided and available, it is used as the short path.
-    - If `name` is provided but already taken, responds with `already taken`.
+    - If `name` is provided and free, it is used.
+    - If `name` is taken, responds with `already taken`.
     - If `name` is empty, a random short code of `length` (default 30) is generated.
-    - If the URL is missing a scheme, the server prefixes `https://`.
-  - Response (text):
-    - For custom alias: `HOST/{name}` (e.g., `localhost:8000/my-link`).
-    - For generated codes: just the short code (e.g., `9f1c2a...`). Use it as `/{code}`.
+    - If the URL lacks a scheme, the server prefixes `https://`.
+  - Response (text): either `HOST/{name}` for custom aliases or the generated code.
 
 - POST `/check`
-  - Request body (JSON):
-    ```json
-    { "url": "https://example.com" }
-    ```
-  - Response (text):
-    - If found: `<short> is your Url`
-    - If not found: empty string
+  - Request JSON: { "url": "https://example.com" }
+  - Response (text): `<short> is your Url` if found, else empty.
 
 - GET `/{short}`
-  - Redirects (301) to the original URL if the short code exists.
+  - Redirects (301) to the original URL if the short exists.
 
-## Configuration
+## Storage Backends
 
-- Port: Hard‑coded to `:8000` in `src/main.go`.
-- Data file: `testdb.txt` in the working directory.
-  - The DB reader uses the `textFileDb.pathToTxt`; writes currently use `testdb.txt` directly.
-  - Make sure the process has permissions to read/write this file.
+- SQLite (default)
+  - File: `/app/data/app.db`.
+  - Driver: CGO‑free `modernc.org/sqlite` (small images, good portability).
+  - WAL mode enabled and a 5s busy timeout configured.
 
-## Known Limitations
-
-- Text‑file storage is not concurrent‑safe and has no locking.
-- No delete/update endpoints; only create and redirect.
-- No authentication, rate limiting, or HTTPS termination.
-- Scheme handling is basic (server may prefix `https://` when missing).
-- Minimal validation; inputs are not sanitized beyond basic checks.
+- Text file (demo only)
+  - Flag: `-textDb`.
+  - File: `testdb.txt` in the working directory.
+  - Format: one mapping per line, `SHORT SPACE ORIGINAL_URL`.
+  - Not safe for concurrent writes and intended only for learning or quick local tests.
 
 ## Project Layout
 
 ```
 .
 ├── src/
-│   ├── db.go      # text‑file DB logic (read/write, lookup)
-│   ├── id.go      # short code generation via uuid
-│   └── main.go    # HTTP server, routes, and static file serving
-├── site/
-│   ├── index.html # UI form
-│   ├── index.css  # styles
-│   └── index.js   # frontend logic (fetch /create, /check)
-├── go.mod         # module and deps
-├── go.sum         # dependency checksums
+│   ├── db.go      # text file backend (demo)
+│   ├── sqldb.go   # SQLite backend (default)
+│   ├── id.go      # short code generation
+│   └── main.go    # HTTP server and routing
+├── site/          # static frontend
+├── Dockerfile
+├── docker-compose.yml
+├── go.mod / go.sum
 └── README.md
 ```
 
-## Development Notes
+## Notes and Limitations
 
-- Redirects are served with `http.StatusMovedPermanently` (301).
-- Short code collision checks are performed against the in‑memory buffer.
-- To change storage location or port, edit `src/main.go` and `src/db.go` accordingly.
+- No authentication or rate limiting.
+- No update/delete endpoints; only create and redirect.
+- Inputs are lightly validated; sanitize at the edge if exposing publicly.
+- On process exit, the OS releases resources, but the SQLite DB is closed explicitly for clean shutdown in typical deployments.
 
-## Examples
+## Quick Examples
 
-Create a short code with a random ID:
+Create a generated short code:
 
 ```bash
 curl -s -X POST http://localhost:8000/create \
   -H 'Content-Type: application/json' \
   -d '{"url":"example.com","length":"12"}'
-# => 12-char code (use as http://localhost:8000/{code})
+# -> 12-char code (use as http://localhost:8000/{code})
 ```
 
 Create a custom alias:
@@ -147,7 +126,7 @@ Create a custom alias:
 curl -s -X POST http://localhost:8000/create \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://example.com","name":"docs"}'
-# => localhost:8000/docs
+# -> localhost:8000/docs
 ```
 
 Check if a URL already has a short code:
@@ -156,10 +135,5 @@ Check if a URL already has a short code:
 curl -s -X POST http://localhost:8000/check \
   -H 'Content-Type: application/json' \
   -d '{"url":"https://example.com"}'
-# => "<short> is your Url" or empty
 ```
-
----
-
-No license specified. Use at your own discretion.
 

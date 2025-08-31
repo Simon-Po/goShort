@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"flag"
 	"io"
 	"log"
 	"net/http"
@@ -56,9 +57,9 @@ func create(db UrlDB) http.HandlerFunc {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		if !strings.HasPrefix(rb.Url,"https://") || !strings.HasPrefix(rb.Url,"Https://") {
-		rb.Url = "https://" + rb.Url
-	}
+    if !(strings.HasPrefix(rb.Url, "https://") || strings.HasPrefix(rb.Url, "http://")) {
+        rb.Url = "https://" + rb.Url
+    }
 
 		found_url, _ := db.CheckUrl(rb.Url)
 		log.Println("Found Url: ", found_url)
@@ -90,7 +91,7 @@ func create(db UrlDB) http.HandlerFunc {
 				if err != nil {
 					continue
 				}
-				if db.CheckForCollion(&shortUrl) == nil {
+				if db.CheckForCollision(&shortUrl) == nil {
 					break
 				}
 			}
@@ -129,13 +130,26 @@ func serveSUrl(writer http.ResponseWriter, req *http.Request, url *string) {
 }
 
 func main() {
-	db := textFileDb{
-		pathToTxt: "testdb.txt",
-	}
+	useText := flag.Bool("textDb",false,"Use the naive textFileDatabase")
+	flag.Parse()
 
-	http.HandleFunc("/", home(&db))
-	http.HandleFunc("/create", create(&db))
-	http.HandleFunc("/check", check(&db))
+    var db UrlDB
+    if *useText {
+        db = &textFileDb{
+            pathToTxt: "testdb.txt",
+        }
+    } else {
+        sdb, err := startSqlDb()
+		defer sdb.closeSqlDb()
+        if err != nil {
+            log.Fatal(err)
+        }
+        db = &sdb
+    }
+
+    http.HandleFunc("/", home(db))
+    http.HandleFunc("/create", create(db))
+    http.HandleFunc("/check", check(db))
 	log.Println("Running on localhost:8000")
 	fs := http.FileServer(http.Dir("site"))
 	http.Handle("/site/", http.StripPrefix("/site/", fs))

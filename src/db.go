@@ -5,13 +5,12 @@ import (
 	"log"
 	"os"
 	"strings"
-
 )
 
 type UrlDB interface {
 	CheckUrl(url string) (string, error)
 	WriteUrl(url, shortUrl string) error
-	CheckForCollion(shortUrl *string) error
+	CheckForCollision(shortUrl *string) error
 	CheckSurl(surl string) (string,error)
 }
 
@@ -34,7 +33,7 @@ func (db *textFileDb) textFileDbRefreshBuffer() {
 
 	db.content = make(map[string]string)
 	db_string := string(data)
-	for line := range strings.SplitSeq(db_string, "\n") {
+    for _, line := range strings.Split(db_string, "\n") {
 
 		content := strings.Split(line, " ")
 
@@ -59,7 +58,7 @@ func (db *textFileDb) textFileDbGetBuffer() {
 
 		db.content = make(map[string]string)
 		db_string := string(data)
-		for line := range strings.SplitSeq(db_string, "\n") {
+        for _, line := range strings.Split(db_string, "\n") {
 
 			content := strings.Split(line, " ")
 
@@ -114,7 +113,7 @@ func (db *textFileDb) WriteUrl(url, shortUrl string) error {
 	return nil
 }
 
-func (db *textFileDb) CheckForCollion(shortUrl *string) error {
+func (db *textFileDb) CheckForCollision(shortUrl *string) error {
 	for entry := range db.content{
 		if(entry == *shortUrl) {
 			return errors.New("") 
@@ -122,4 +121,3 @@ func (db *textFileDb) CheckForCollion(shortUrl *string) error {
 	}
 	return nil
 }
-
