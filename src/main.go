@@ -148,8 +148,8 @@ func main() {
     }
 
     http.HandleFunc("/", home(db))
-    http.HandleFunc("/create", create(db))
-    http.HandleFunc("/check", check(db))
+    http.HandleFunc("POST /create", create(db))
+    http.HandleFunc("POST /check", check(db))
 	log.Println("Running on localhost:8000")
 	fs := http.FileServer(http.Dir("site"))
 	http.Handle("/site/", http.StripPrefix("/site/", fs))
