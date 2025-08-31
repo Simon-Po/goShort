@@ -4,6 +4,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const nameInput = document.querySelector('#urlName');
   const slider = document.getElementById('lengthSlider');
   const sliderLabel = document.querySelector('label[for="lengthSlider"]');
+  const lengthValue = document.getElementById('lengthValue'); // 👈 span inside the label
   const validateBtn = document.querySelector('.btn.validate');
   const confirmBtn = document.querySelector('.btn.confirm');
 
@@ -13,15 +14,19 @@ document.addEventListener('DOMContentLoaded', () => {
     el.textContent = t;
   };
 
+  // 🔁 keep the "Length: <span>" in sync with the slider
+  const updateSliderLabel = () => {
+    if (lengthValue) lengthValue.textContent = String(slider.value);
+  };
+  updateSliderLabel();                 // set initial value on load
+  slider.addEventListener('input', updateSliderLabel); // update live as it moves
+
   // 👇 toggle slider visibility based on urlName input
   nameInput.addEventListener('input', () => {
-    if (nameInput.value.trim() !== '') {
-      slider.style.display = 'none';
-      sliderLabel.style.display = 'none';
-    } else {
-      slider.style.display = 'block';
-      sliderLabel.style.display = 'block';
-    }
+    const show = nameInput.value.trim() === '';
+    slider.style.display = show ? 'block' : 'none';
+    sliderLabel.style.display = show ? 'block' : 'none';
+    if (show) updateSliderLabel(); // ensure it's correct when re-shown
   });
 
   confirmBtn.addEventListener('click', async (e) => {
@@ -33,8 +38,6 @@ document.addEventListener('DOMContentLoaded', () => {
       url: urlInput.value,
       length: String(slider.value)
     };
-
-    console.log('about to POST /create with payload:', payload);
 
     try {
       const resp = await fetch('/create', {
