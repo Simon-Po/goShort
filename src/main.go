@@ -140,6 +140,9 @@ func main() {
         }
     } else {
         sdb, err := startSqlDb()
+		if err != nil {
+			log.Fatal("ERROR: Could not start sql Database connection")
+		}
 		defer sdb.closeSqlDb()
         if err != nil {
             log.Fatal(err)

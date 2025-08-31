@@ -1,10 +1,13 @@
 package main
-import (
-	"strings"
-	"errors"
-	"github.com/google/uuid"
-) 
 
+import (
+	"errors"
+	"strings"
+
+	"github.com/google/uuid"
+)
+
+// TODO: Add more generation methods
 type idGen interface {
 	Generate(length int32) (string,error)
 } 

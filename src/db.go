@@ -95,6 +95,9 @@ func (db *textFileDb) CheckSurl(surl string) (string,error) {
 
 func (db *textFileDb) WriteUrl(url, shortUrl string) error {
 	f, err := os.OpenFile("testdb.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Println("ERROR: Could not open file for Text DB")
+	}
 	defer f.Close()
 	if err != nil {
 		log.Println("Testdb could not be opened")
